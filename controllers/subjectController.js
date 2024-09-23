@@ -86,7 +86,7 @@ exports.getSubject = async (req, res) => {
     // Busca o documento da matéria no CouchDB
     const courses = await coursesDB.get(courseId);
 
-    console.log(courses.subjects)
+    // console.log(courses.subjects)
 
     if (!courses.subjects) {
       return res.status(404).json({ error: 'Nenhuma matéria encontrada.' });

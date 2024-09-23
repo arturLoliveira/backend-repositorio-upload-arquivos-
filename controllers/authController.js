@@ -6,8 +6,11 @@ exports.addUserToCourse = async (req, res) => {
   const { courseId } = req.params;
   const { name, email, password } = req.body;
 
+
   try {
-    const course = await coursesDB.get(email);
+    const course = await coursesDB.get(courseId);
+
+    // console.log(course)
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
@@ -21,9 +24,9 @@ exports.addUserToCourse = async (req, res) => {
     };
 
     await coursesDB.insert(newUser)
-    if (!course.users) {
-      course.users = [];
-    }
+    // if (!course.users) {
+    //   course.users = [];
+    // }
     course.users.push(newUser._id);
     await coursesDB.insert(course);
 
@@ -43,7 +46,6 @@ exports.login = async (req, res) => {
   const { email, password } = req.body;
  console.log(email, password)
  const user = await coursesDB.get(email, password);
- console.log(user.password, user.email)
   try {
     const user = await coursesDB.get(email);
 
