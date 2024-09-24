@@ -1,6 +1,8 @@
 const multer = require('multer');
 const path = require('path');
 const coursesDB = require('../db/couch');
+const fs = require('fs');
+
 
 // Configuração do multer
 const storage = multer.diskStorage({
@@ -99,6 +101,40 @@ exports.getSubject = async (req, res) => {
   }
 };
 
+exports.deleteFileFromSubject = async (req, res) => {
+  try {
+    const { subjectId, fileId } = req.params;
 
-// Exporta o middleware de upload
+    const subject = await coursesDB.get(subjectId);
+
+    const fileIndex = subject.files.findIndex(file => file.file_id === fileId);
+
+    if (fileIndex === -1) {
+      return res.status(404).json({ error: 'Arquivo não encontrado' });
+    }
+
+    const file = subject.files[fileIndex];
+    const filePath = path.join( 'uploads', file.name);
+    console.log(filePath)
+
+    subject.files.splice(fileIndex, 1);
+
+    await coursesDB.insert(subject);
+
+    // Remove o arquivo fisicamente da pasta uploads
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error('Erro ao deletar arquivo físico:', err);
+        return res.status(500).json({ error: 'Erro ao deletar arquivo físico' });
+      }
+      console.log('Arquivo deletado com sucesso:', filePath);
+    });
+
+    return res.status(200).json({ message: 'Arquivo deletado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao deletar arquivo:', err);
+    return res.status(500).json({ error: 'Erro ao deletar arquivo', details: err });
+  }
+};
+
 exports.upload = upload;
