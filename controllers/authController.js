@@ -1,4 +1,6 @@
 const coursesDB = require('../db/couch');
+const nodemailer = require('nodemailer');
+const crypto = require('crypto');
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 
@@ -85,7 +87,7 @@ exports.protect = (req, res, next) => {
 };
 
 exports.adminProtect = (req, res, next) => {
-  const token = req.header('Authorization').replace('Bearer ', '');
+  const token = req.header('Authorization')?.replace('Bearer ', '');
   const decoded = jwt.verify(token, 'secreta'); 
 
   req.user = decoded;
@@ -94,4 +96,75 @@ exports.adminProtect = (req, res, next) => {
   }
   console.log(req.user.role)
   next();
+};
+
+exports.requestPasswordReset = async (req, res) => {
+  const { email } = req.body;
+
+
+  try {
+      const user = await coursesDB.get(email);
+      if (!user) {
+          return res.status(404).json({ error: 'Usuário não encontrado.' });
+      }
+
+      const resetToken = crypto.randomBytes(32).toString('hex');
+      const tokenExpiration = Date.now() + 3600000; 
+
+      user.resetToken = resetToken;
+      user.resetTokenExpiration = tokenExpiration;
+      await coursesDB.insert(user);
+
+      const transporter = nodemailer.createTransport({
+          service: 'gmail',
+          auth: {
+              user: 'dearquivosarmazenamento@gmail.com',
+              pass: 'swdr cwms hzjo rped',
+          },
+      });
+
+      const resetLink = `http://localhost:5173/reset-password/${resetToken}`;
+
+      await transporter.sendMail({
+          to: email,
+          from: 'arturlinhares2001@gmail.com',
+          subject: 'Recuperação de senha',
+          html: `
+              <p>Você solicitou a recuperação de senha.</p>
+              <p>Clique no link abaixo para redefinir sua senha:</p>
+              <a href="${resetLink}">Redefinir Senha</a>
+          `,
+      });
+
+      res.status(200).json({ message: 'Email de recuperação enviado.' });
+  } catch (error) {
+      console.error('Erro ao solicitar recuperação de senha:', error);
+      res.status(500).json({ error: 'Erro ao solicitar recuperação de senha' });
+  }
+};
+
+exports.resetPassword = async (req, res) => {
+  const { token } = req.params; 
+  const { password, email } = req.body;
+  console.log(email, password)
+
+
+  try {
+    const user = await coursesDB.get(email); 
+    if (!user || user.resetToken !== token || user.resetTokenExpiration < Date.now()) {
+        return res.status(400).json({ error: 'Token inválido ou expirado.' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    user.password = hashedPassword;
+    delete user.resetToken;
+    delete user.resetTokenExpiration;
+    await coursesDB.insert(user);
+
+    res.status(200).json({ message: 'Senha redefinida com sucesso!' });
+  } catch (error) {
+    console.error('Erro ao redefinir senha:', error);
+    res.status(500).json({ error: 'Erro ao redefinir senha' });
+  }
 };

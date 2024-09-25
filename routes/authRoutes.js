@@ -8,4 +8,8 @@ router.post('/courses/:courseId/users', authController.addUserToCourse);
 
 router.post('/auth/login', authController.login);
 
+router.post('/auth/recover-password', authController.requestPasswordReset);
+
+router.post('/auth/reset-password/:token', authController.resetPassword);
+
 module.exports = router;
