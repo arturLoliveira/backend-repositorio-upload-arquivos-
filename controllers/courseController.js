@@ -1,4 +1,4 @@
-const coursesDB = require('../db/couch'); 
+const coursesDB = require('../db/couch');
 
 exports.addCourse = async (req, res) => {
   try {
@@ -15,7 +15,7 @@ exports.addCourse = async (req, res) => {
       type: 'course',
       name,
       description,
-      subjects: []  
+      subjects: []
     });
 
 
@@ -26,7 +26,7 @@ exports.addCourse = async (req, res) => {
     });
 
   } catch (err) {
-    console.error('Erro ao criar curso:', err); 
+    console.error('Erro ao criar curso:', err);
     res.status(500).json({
       error: 'Erro ao criar curso',
       details: err.message || err
@@ -43,7 +43,7 @@ exports.addSubjectToCourse = async (req, res) => {
       return res.status(400).json({ error: 'Nome da matéria é obrigatório.' });
     }
     const course = await coursesDB.get(courseId);
-    
+
     if (!course) {
       return res.status(404).json({ error: 'Curso não encontrado.' });
     }
@@ -54,7 +54,8 @@ exports.addSubjectToCourse = async (req, res) => {
       type: 'subject',
       name,
       course_id: courseId,
-      files: [] 
+      files: [],
+      folders: []
     };
 
 
@@ -72,30 +73,117 @@ exports.addSubjectToCourse = async (req, res) => {
     res.status(500).json({ error: 'Erro ao adicionar matéria', details: err.message });
   }
 };
-  exports.addFileToSubject = async (req, res) => {
-    try {
-      const { subjectId } = req.params;
-      const { name, size, type } = req.body; 
-  
-      const subject = await coursesDB.get(subjectId);
+exports.addFolderToSubject = async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+    const { name } = req.body;
 
-      subject.files.push({
-        file_id: `file_${new Date().getTime()}`,
-        name,
-        size,
-        type,
-        upload_date: new Date().toISOString()
-      });
-
-      const response = await coursesDB.insert(subject);
-  
-      res.status(201).json({
-        message: 'Arquivo adicionado com sucesso',
-        subjectId: response.id,
-        rev: response.rev
-      });
-    } catch (err) {
-      res.status(500).json({ error: 'Erro ao adicionar arquivo', details: err });
+    if (!name) {
+      return res.status(400).json({ error: 'Nome da pasta é obrigatório.' });
     }
-  };
-  
+    const subject = await coursesDB.get(subjectId);
+
+    if (!subject) {
+      return res.status(404).json({ error: 'Matéria não encontrada.' });
+    }
+
+
+    const newFolder = {
+      _id: `${name.toLowerCase().replace(/\s/g, '_')}`,
+      type: 'folder',
+      name,
+      subject_id: subjectId,
+      files: []
+    };
+
+
+    await coursesDB.insert(newFolder);
+
+    if (!subject.folders) {
+      subject.folders = [];
+    }
+    subject.folders.push(newFolder._id);
+    await coursesDB.insert(subject);
+
+    res.status(201).json({ message: 'Matéria adicionada ao curso com sucesso', subjectId: newFolder._id });
+  } catch (err) {
+    console.error('Erro ao adicionar matéria ao curso:', err);
+    res.status(500).json({ error: 'Erro ao adicionar matéria', details: err.message });
+  }
+};
+// exports.addFoldersToSubject = async (req, res) => {
+//   try {
+//     const { subjectId } = req.params;
+//     const { name} = req.body;
+
+//     const subject = await coursesDB.get(subjectId);
+
+//     subject.folders.push({
+//       folder_id: `file_${new Date().getTime()}`,
+//       name,
+//       files: []
+//     });
+
+//     const response = await coursesDB.insert(subject);
+
+//     res.status(201).json({
+//       message: 'Pasta adicionada com sucesso',
+//       folderId: response.id,
+//       rev: response.rev
+//     });
+//   } catch (err) {
+//     res.status(500).json({ error: 'Erro ao adicionar pasta', details: err });
+//   }
+// };
+exports.addFileToSubject = async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+    const { name, size, type } = req.body;
+
+    const subject = await coursesDB.get(subjectId);
+
+    subject.folders.files.push({
+      file_id: `file_${new Date().getTime()}`,
+      name,
+      size,
+      type,
+      upload_date: new Date().toISOString()
+    });
+
+    const response = await coursesDB.insert(subject);
+
+    res.status(201).json({
+      message: 'Arquivo adicionado com sucesso',
+      subjectId: response.id,
+      rev: response.rev
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao adicionar arquivo', details: err });
+  }
+};
+exports.addFileToFolder = async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+    const { name, size, type } = req.body;
+
+    const subject = await coursesDB.get(subjectId);
+
+    subject.folders.files.push({
+      file_id: `file_${new Date().getTime()}`,
+      name,
+      size,
+      type,
+      upload_date: new Date().toISOString()
+    });
+
+    const response = await coursesDB.insert(subject);
+
+    res.status(201).json({
+      message: 'Arquivo adicionado com sucesso',
+      subjectId: response.id,
+      rev: response.rev
+    });
+  } catch (err) {
+    res.status(500).json({ error: 'Erro ao adicionar arquivo', details: err });
+  }
+};

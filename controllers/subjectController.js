@@ -57,6 +57,52 @@ exports.addFileToSubject = async (req, res) => {
     res.status(500).json({ error: 'Erro ao adicionar arquivo', details: err.message || err });
   }
 };
+exports.addFileToFolder = async (req, res) => {
+  try {
+    const { folderId } = req.params;
+
+    console.log(req.params)
+    // console.log(req.file)
+
+    if (!req.file) {
+      return res.status(400).json({ error: 'Nenhum arquivo enviado.' });
+    }
+
+
+    const fileUrl = `http://localhost:3001/uploads/${req.file.filename}`;
+   
+
+    const folder = await coursesDB.get(folderId);
+    // const folder = await subject.get(folderId)
+    // console.log(folder)
+
+    if (!folder) {
+      return res.status(404).json({ error: 'Pasta não encontrada.' });
+    }
+
+    folder.files.push({
+      file_id: `file_${new Date().getTime()}`,
+      name: req.file.filename,
+      original_name: req.file.originalname,
+      size: req.file.size,
+      type: req.file.mimetype,
+      upload_date: new Date().toISOString(),
+      url: fileUrl 
+    });
+
+    const response = await coursesDB.insert(folder);
+
+    res.status(201).json({
+      message: 'Arquivo adicionado com sucesso',
+      subjectId: response.id,
+      rev: response.rev,
+      url: fileUrl 
+    });
+  } catch (err) {
+    console.error('Erro ao adicionar arquivo à matéria:', err);
+    res.status(500).json({ error: 'Erro ao adicionar arquivo', details: err.message || err });
+  }
+};
 
 exports.getFilesForSubject = async (req, res) => {
   try {
@@ -75,12 +121,28 @@ exports.getFilesForSubject = async (req, res) => {
     res.status(500).json({ error: 'Erro ao buscar arquivos', details: err.message || err });
   }
 };
+exports.getFilesForFolders = async (req, res) => {
+  try {
+    const { folderId } = req.params;
+
+
+    const folder = await coursesDB.get(folderId);
+
+    if (!folder || !folder.files) {
+      return res.status(404).json({ error: 'Nenhum arquivo encontrado para esta pasta.' });
+    }
+
+    res.status(200).json({ files: folder.files });
+  } catch (err) {
+    console.error('Erro ao buscar arquivos para a pasta:', err);
+    res.status(500).json({ error: 'Erro ao buscar arquivos', details: err.message || err });
+  }
+};
 exports.getSubject = async (req, res) => {
   try {
     const { courseId } = req.params;
 
     const courses = await coursesDB.get(courseId);
-
 
     if (!courses.subjects) {
       return res.status(404).json({ error: 'Nenhuma matéria encontrada.' });
@@ -90,6 +152,22 @@ exports.getSubject = async (req, res) => {
   } catch (err) {
     console.error('Erro ao buscar a matéria:', err);
     res.status(500).json({ error: 'Erro ao buscar a materia', details: err.message || err });
+  }
+};
+exports.getFolder = async (req, res) => {
+  try {
+    const { subjectId } = req.params;
+
+    const subject = await coursesDB.get(subjectId);
+
+    if (!subject.folders) {
+      return res.status(404).json({ error: 'Nenhuma pasta encontrada.' });
+    }
+
+    res.status(200).json({ subjects: subject.folders });
+  } catch (err) {
+    console.error('Erro ao buscar a pasta:', err);
+    res.status(500).json({ error: 'Erro ao buscar a pasta', details: err.message || err });
   }
 };
 
@@ -111,6 +189,39 @@ exports.deleteFileFromSubject = async (req, res) => {
     subject.files.splice(fileIndex, 1);
 
     await coursesDB.insert(subject);
+
+    fs.unlink(filePath, (err) => {
+      if (err) {
+        console.error('Erro ao deletar arquivo físico:', err);
+        return res.status(500).json({ error: 'Erro ao deletar arquivo físico' });
+      }
+      console.log('Arquivo deletado com sucesso:', filePath);
+    });
+
+    return res.status(200).json({ message: 'Arquivo deletado com sucesso' });
+  } catch (err) {
+    console.error('Erro ao deletar arquivo:', err);
+    return res.status(500).json({ error: 'Erro ao deletar arquivo', details: err });
+  }
+};
+exports.deleteFileFromFolders = async (req, res) => {
+  try {
+    const { folderId, fileId } = req.params;
+
+    const folder = await coursesDB.get(folderId);
+
+    const fileIndex = folder.files.findIndex(file => file.file_id === fileId);
+
+    if (fileIndex === -1) {
+      return res.status(404).json({ error: 'Arquivo não encontrado' });
+    }
+
+    const file = folder.files[fileIndex];
+    const filePath = path.join( 'uploads', file.name);
+
+    folder.files.splice(fileIndex, 1);
+
+    await coursesDB.insert(folder);
 
     fs.unlink(filePath, (err) => {
       if (err) {

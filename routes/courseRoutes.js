@@ -8,9 +8,11 @@ const router = express.Router();
 router.post('/courses', courseController.addCourse);
 
 router.post('/courses/:courseId/subjects', authController.adminProtect, courseController.addSubjectToCourse);
+router.post('/courses/:subjectId/folders', courseController.addFolderToSubject);
 
 
 router.post('/subjects/:subjectId/files', subjectController.upload.single('file'), subjectController.addFileToSubject);
+router.post('/subjects/folders/:folderId/files', subjectController.upload.single('file'), subjectController.addFileToFolder);
 
 
 
